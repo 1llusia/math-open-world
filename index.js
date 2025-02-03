@@ -186,8 +186,8 @@ function update() {
 	}
 
   // Update camera position
-  camera.x = player.worldX - canvas.width / 2
-  camera.y = player.worldY - canvas.height / 2
+  camera.x = player.worldX - (canvas.width - TILE_SIZE)/ 2 
+  camera.y = player.worldY - (canvas.height - TILE_SIZE)/ 2 
 }
 
 function render() {
