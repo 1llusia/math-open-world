@@ -2,7 +2,8 @@ import { Game } from "../core/game.js"
 import { Hitbox } from "./hitbox.js"
 import { Map } from "../world/map.js"
 import { Tileset } from "../world/tileset.js"
-import { constants } from "../constants.js"
+import { constants } from "../constants.js"
+import { clamp } from "../utils.js"
 
 export class Entity {
 
@@ -65,15 +66,15 @@ export class Entity {
     }
 
     this.collision_hitbox.get_colliding_hitboxes(true, false).forEach(hitbox => {
-			hitbox.command(this, hitbox)
+			hitbox.command(this, hitbox, current_time)
 		})
 
 		this.combat_hitbox.get_colliding_hitboxes(false, true).forEach(hitbox => {
-			hitbox.command(this, hitbox)
+			hitbox.command(this, hitbox, current_time)
 		})
 
 		this.combat_hitbox.get_colliding_hitboxes(false, false).forEach(hitbox => {
-			hitbox.command(this, hitbox)
+			hitbox.command(this, hitbox, current_time)
 		})
 
     this.handleAnimation(current_time)
@@ -81,7 +82,7 @@ export class Entity {
 
   updatePositionX() {
     const halfHitboxWidth = this.combat_hitbox.width / 2
-    this.worldX = Entity.clamp(
+    this.worldX = clamp(
       this.worldX + this.dx,
       halfHitboxWidth,
       this.game.map.world.width - halfHitboxWidth
@@ -90,7 +91,7 @@ export class Entity {
 
   updatePositionY() {
     const halfHitboxHeight = this.combat_hitbox.height / 2
-    this.worldY = Entity.clamp(
+    this.worldY = clamp(
       this.worldY + this.dy,
       halfHitboxHeight,
       this.game.map.world.height - halfHitboxHeight
@@ -100,17 +101,6 @@ export class Entity {
 	updateCollisionHitbox() {
 		this.collision_hitbox.set(this.worldX - this.collision_hitbox.width / 2, this.worldY)
 	}
-
-  /**
-   * 
-   * @param {Number} value 
-   * @param {Number} min 
-   * @param {Number} max 
-   * @returns {Number}
-   */
-  static clamp(value, min, max) {
-    return Math.max(min, Math.min(max, value))
-  }
 
   colliding() {
     for (let collision_hitbox of this.game.collision_hitboxes) {
@@ -136,9 +126,10 @@ export class Entity {
    * @returns 
    */
   handleAnimation(current_time) {
+    this.updateDirection()
+    
     if (current_time - this.last_time < this.animation_duration) return
 
-    this.updateDirection()
     this.animation_step = (this.dx || this.dy) ? (this.animation_step + 1) % 4 : 0
 
     this.last_time = current_time
@@ -152,6 +143,7 @@ export class Entity {
     } else {
       this.direction = this.dx > 0 ? 2 : 3
     }
+
   }
 
   render() {
@@ -173,5 +165,13 @@ export class Entity {
       this.worldY + this.combat_hitbox.height / 2>= this.game.camera.y &&
       this.worldY - this.combat_hitbox.height / 2<= this.game.camera.y + this.game.canvas.height
     )
+  }
+
+  set_map(new_map) {
+		this.map = new_map
+    this.collision_hitbox.set_map(new_map)
+		this.combat_hitbox.set_map(new_map)
+    if (this.raycast_hitbox)
+      this.raycast_hitbox.set_map(new_map)
   }
 }

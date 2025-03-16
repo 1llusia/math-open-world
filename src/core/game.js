@@ -9,7 +9,8 @@ import { Attack } from '../entities/attack.js'
 import { Ui } from '../ui/ui.js'
 import { Button, Icon, Label, NumberArea, TextArea, Texture } from '../ui/widgets.js'
 import { Talkable } from '../entities/talkable.js'
-import { constants } from "../constants.js"
+import { constants } from "../constants.js"
+import { Transition, UnicoloreTransition } from '../ui/transition.js'
 
 export class Game {
 	constructor() {
@@ -53,7 +54,7 @@ export class Game {
 		/** @type {Array<Talkable>} */
 		this.talkables = []
 
-		/** @type {Ui} */
+		/** @type {Ui | Transition} */
 		this.current_ui = null
 
 		this.camera = { x: -1000, y: -1000 }
@@ -84,21 +85,24 @@ export class Game {
 		//new Hitbox(this, this.get_current_map(), 1000, 1000 + this.TILE_SIZE / 2, this.TILE_SIZE, this.TILE_SIZE / 2, false, false, (e, h) => {this.set_map(1)})
 		//new Hitbox(this, this.maps[1], 500, 500 + this.TILE_SIZE / 2, this.TILE_SIZE, this.TILE_SIZE / 2, false, false, (e, h) => {this.set_map(0)})
 
+		// used to place the player correctly
 		this.update()
+
+		const black_transition = new UnicoloreTransition(this, 500, "black")
 
 		const colors_problem = await Problem.create(
 			this, "images/parchment1.png", 500, 500, "colors",
 			[
-				new Label(this, "label-red", -150, -150, "Rouge:", true, 30),
-				new NumberArea(this, "numberarea-red", -50, -150, 100, 50, 15, true, (answer, numberarea) => {}, 20),
+				new Label(this, "label-red", -150, -78, "Rouge:", true, 30),
+				new NumberArea(this, "numberarea-red", -50, -110, 100, 50, 15, true, (answer, numberarea) => {}, 20),
 
-				new Label(this, "label-green", -150, -50, "Vert:", true, 30),
-				new NumberArea(this, "numberarea-green", -50, -50, 100, 50, 15, true, (answer, numberarea) => {}, 20),
+				new Label(this, "label-green", -130, 4, "Vert:", true, 30),
+				new NumberArea(this, "numberarea-green", -50, -30, 100, 50, 15, true, (answer, numberarea) => {}, 20),
 
-				new Label(this, "label-yellow", -150, 50, "Jaune:", true, 30),
+				new Label(this, "label-yellow", -150, 82, "Jaune:", true, 30),
 				new NumberArea(this, "numberarea-yellow", -50, 50, 100, 50, 15, true, (answer, numberarea) => {}, 20),
 
-				new Button(this, "button-submit", -25, 150, 100, 50, true, (button) => {
+				new Button(this, "button-submit", -50, 155, 100, 50, true, (button) => {
 					const numberarea_red = button.ui.get_widget("numberarea-red");
 					const numberarea_green = button.ui.get_widget("numberarea-green");
 					const numberarea_yellow = button.ui.get_widget("numberarea-yellow");
@@ -111,6 +115,9 @@ export class Game {
 						console.log("mauvaises réponses [debug: bonnes réponses sont 3, 2, 3]");
 						console.log(numberarea_red.content, numberarea_green.content , numberarea_yellow.content );
 					}
+				}),
+				new Button(this,"button-undo",125,-211,50,50,true,(button)=>{
+					button.ui.is_finished=true
 				})
 			],
 			(problem) => {
@@ -120,22 +127,55 @@ export class Game {
 			}
 		)
 		new Talkable(this, this.get_current_map(),
-			new Hitbox(this, this.get_current_map(), 0, constants.TILE_SIZE * 2, this.TILE_SIZE, this.TILE_SIZE, true, false, (entity, hitbox) => {}),
+			new Hitbox(this, this.get_current_map(), 0, constants.TILE_SIZE * 2, this.TILE_SIZE, this.TILE_SIZE, true, false, null, (e, h, t) => {}),
 			colors_problem, null
 		)
 
-
-		// switch map hitboxes
-		new Hitbox(this, this.get_current_map(), 3.5 * constants.TILE_SIZE, 4.5 * constants.TILE_SIZE, constants.TILE_SIZE, constants.TILE_SIZE / 2, false, false, () => {
-			this.get_current_map().player_pos.x = this.player.worldX;
-			this.get_current_map().player_pos.y = this.player.worldY - constants.TILE_SIZE / 2;
+		// SWITCH MAP HITBOXES
+		// -- from the house (manual)
+		new Hitbox(this, this.get_current_map(), 3 * constants.TILE_SIZE, 5 * constants.TILE_SIZE, 2 * constants.TILE_SIZE, constants.TILE_SIZE, false, false, null, (e, h, time) => {
+			if (!this.inputHandler.isKeyPressed(constants.INTERACTION_KEY)) return // one must press INTERACTION_KEY to switch map
+			this.maps[0].player_pos = {x: 4 * constants.TILE_SIZE, y: 5 * constants.TILE_SIZE}
 			this.set_map(1)
-			this.player.set_map(this.get_current_map())
+
+			this.player.set_map(this.maps[1])
+			this.player.direction = 0
+
+			black_transition.start(time)
+		})
+		// -- from the house (auto)
+		new Hitbox(this, this.get_current_map(), 3 * constants.TILE_SIZE, 5.75 * constants.TILE_SIZE, 2 * constants.TILE_SIZE, constants.TILE_SIZE / 4, false, false, null, (e, h, time) => {
+			this.maps[0].player_pos = {x: 4 * constants.TILE_SIZE, y: 5 * constants.TILE_SIZE}
+			this.set_map(1)
+
+			this.player.set_map(this.maps[1])
+			this.player.direction = 0
+
+			black_transition.start(time)
 		})
 
-		new Hitbox(this, this.maps[1], 15 * constants.TILE_SIZE, 14 * constants.TILE_SIZE, constants.TILE_SIZE, constants.TILE_SIZE / 2, false, false, () => {
+		// -- from the outside (manually activated)
+		new Hitbox(this, this.maps[1], 15 * constants.TILE_SIZE, 13.5 * constants.TILE_SIZE, constants.TILE_SIZE, constants.TILE_SIZE / 2, false, false, null, (e, h, time) => {
+						if (!this.inputHandler.isKeyPressed(constants.INTERACTION_KEY)) return
+			this.maps[1].player_pos = {x: 15.5 * constants.TILE_SIZE, y: 14.01 * constants.TILE_SIZE}
+
 			this.set_map(0)
-			this.player.set_map(this.get_current_map())
+
+			this.player.set_map(this.maps[0])
+			this.player.direction = 1
+
+			black_transition.start(time)
+		})
+		// -- from the outside (automatic)
+		new Hitbox(this, this.maps[1], 15 * constants.TILE_SIZE, 13 * constants.TILE_SIZE, constants.TILE_SIZE, constants.TILE_SIZE / 4, false, false, null, (e, h, time) => {
+			this.maps[1].player_pos = {x: 15.5 * constants.TILE_SIZE, y: 14.01 * constants.TILE_SIZE}
+
+			this.set_map(0)
+
+			this.player.set_map(this.maps[0])
+			this.player.direction = 1
+
+			black_transition.start(time)
 		})
 
 		requestAnimationFrame(this.loop.bind(this))
@@ -219,7 +259,6 @@ export class Game {
 	set_map(new_map_nb){
 		this.current_map = new_map_nb
 		this.map = this.maps[this.current_map]
-		this.player.set_map(this.map)
 	}
 
 	get_current_map(){
